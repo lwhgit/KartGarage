@@ -65,3 +65,12 @@ RiderData > Record > Replay > Emblem > Item 입니다.
 ItemDataReceiveListener의 onAllItemReceive 콜백은 아이템 하나하나 파싱될 때 마다 호출됩니다.   
 대상의 아이템이 많다고 걱정하실 필요 없고 받아올 때 마다 추가해 주시면 됩니다.
 
+#### 현재까지 완료된 기능
+* 라이더 데이터 o   
+라이더의 이름, 레벨 이미지, 길드마크, 길드이름
+* 아이템 o   
+아이템 갯수, 대표아이템, 모든 아이템
+* 엠블럼 x
+* 기록실 x
+* 리플레이 x
+
