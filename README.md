@@ -31,7 +31,7 @@
     garageParser.parseMain();
     garageParser.parseItem();
 	
-### 주의하세요
+### 주의하세요.
 * 파싱을 그만 둘 때는 stopTask() 메소드를 꼭 호출해 주세요.
 * 이미지를 가져오는데, 길드마크가 없거나, 홈페이지 오류때문에 null값이 반환 될 수 있습니다. NullPointerException이 일어나지 않도록 조심하세요.
 
