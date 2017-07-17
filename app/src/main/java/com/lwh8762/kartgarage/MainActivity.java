@@ -22,12 +22,7 @@ public class MainActivity extends AppCompatActivity {
         garageParser.setRiderDataReceiveListener(new GarageParser.RiderDataReceiveListener() {
             @Override
             public void onRiderDataReceive(GarageParser.RiderData riderData) {
-                textView.append("Name : " + riderData.getRiderName() + "\nGuild Name " + riderData.getGuildName());
-            }
-
-            @Override
-            public void onParsingEnd() {
-                garageParser.parseItem();
+                textView.append("\nName : " + riderData.getRiderName() + "\nGuild Name " + riderData.getGuildName());
             }
         });
         garageParser.setItemDataReceiveListener(new GarageParser.ItemDataReceiveListener() {
@@ -40,21 +35,17 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onRepresentationItemReceive(ArrayList<GarageParser.ItemData> items) {
                 textView.append("\nRepresentation");
-                for (GarageParser.ItemData data : items)
-                    textView.append("\nName : " + data.getName());
+                for (GarageParser.ItemData item : items)
+                    textView.append("\nItem Name : " + item.getName() + "\n\tItem Count : " + item.getCount());
             }
 
             @Override
-            public void onAllItemReceive(GarageParser.ItemData items) {
-                textView.append("\nItem Name : " + items.getName());
-            }
-
-            @Override
-            public void onParsingEnd() {
-
+            public void onAllItemReceive(GarageParser.ItemData item) {
+                textView.append("\nItem Name : " + item.getName() + "\n\tItem Count : " + item.getCount());
             }
         });
         garageParser.parseMain();
+        garageParser.parseItem();
     }
 
     @Override
