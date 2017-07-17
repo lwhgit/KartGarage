@@ -41,8 +41,6 @@ public class GarageParser {
 
     private String name = null;
 
-    private HtmlLoader htmlLoader = null;
-
     private MainParseTask mainParseTask = null;
     private ItemParseTask itemParseTask = null;
 
@@ -54,17 +52,10 @@ public class GarageParser {
     public GarageParser(Context context, String name) {
         try {
             this.context = context;
-
             this.name = URLEncoder.encode(name, "utf-8");
-
-            htmlLoader = new HtmlLoader(context);
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         }
-    }
-
-    public HtmlLoader getHtmlLoader() {
-        return htmlLoader;
     }
 
     public void setRiderDataReceiveListener(RiderDataReceiveListener riderDataReceiveListener) {
@@ -77,12 +68,12 @@ public class GarageParser {
 
     public void parseMain() {
         mainParseTask = new MainParseTask();
-        mainParseTask.execute(name);
+        mainParseTask.execute(MAIN_URL + name);
     }
 
     public void parseItem() {
         itemParseTask = new ItemParseTask();
-        itemParseTask.execute(name);
+        itemParseTask.execute(ITEM_URL + name);
     }
 
     public void stopTask() {
@@ -91,43 +82,6 @@ public class GarageParser {
         }
         if (itemParseTask.getStatus() == AsyncTask.Status.RUNNING) {
             itemParseTask.cancel(true);
-        }
-    }
-
-    private static class HtmlLoader extends WebView {
-        private HtmlLoadListener htmlLoadListener = null;
-
-        public HtmlLoader(Context context) {
-            super(context);
-            getSettings().setJavaScriptEnabled(true);
-            setWebViewClient(new WebViewClient() {
-
-
-                @Override
-                public void onPageFinished(WebView view, String url) {
-                    view.loadUrl("javascript:window.AndroidInterface.receiveHtml(document.getElementsByTagName('html')[0].innerHTML);");
-                }
-            });
-            addJavascriptInterface(new Object() {
-                @JavascriptInterface
-                public void receiveHtml(String html) {
-                    if (htmlLoadListener != null) {
-                        htmlLoadListener.onHtmlLoad(html);
-                    }
-                }
-            }, "AndroidInterface");
-        }
-
-        public void requestGetHtml(String url) {
-            loadUrl(url);
-        }
-
-        public void setHtmlLoadListener(HtmlLoadListener htmlLoadListener) {
-            this.htmlLoadListener = htmlLoadListener;
-        }
-
-        interface HtmlLoadListener {
-            public void onHtmlLoad(String html);
         }
     }
 
@@ -178,6 +132,10 @@ public class GarageParser {
             this.count = count;
         }
 
+        public void setName(String name) {
+            this.name = name;
+        }
+
         public Bitmap getImage() {
             return image;
         }
@@ -194,47 +152,31 @@ public class GarageParser {
     private class MainParseTask extends AsyncTask<String, RiderData, Integer> {
         @Override
         protected Integer doInBackground(final String... params) {
-            final String[] receivedHtml = new String[1];
-            ((Activity) context).runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    htmlLoader.requestGetHtml(MAIN_URL + params[0]);
-                    htmlLoader.setHtmlLoadListener(new HtmlLoader.HtmlLoadListener() {
-                        @Override
-                        public void onHtmlLoad(String html) {
-                            receivedHtml[0] = html;
-                        }
-                    });
-                }
-            });
+            try {
+                Document document = Jsoup.connect(params[0]).get();
+                String riderImageUrl = document.select("span#RiderImg > img").attr("src");
+                String riderName = document.select("span#RiderName").text();
+                String gloveImageUrl = document.select("div#GloveImg > img").attr("src");
+                String guildImageUrl = document.select("span#GuildImg > img").attr("src");
+                String guildName = document.select("span#GuildName").text();
 
-            while(receivedHtml[0] == null) {
-                if (isCancelled()) {
-                    return null;
-                }
+                Log.i("RiderData", "Rider Image URL: " + riderImageUrl);
+                Log.i("RiderData", "Rider Name: " + riderName);
+                Log.i("RiderData", "Glove Image URL: " + gloveImageUrl);
+                Log.i("RiderData", "Guild Image URL: " + guildImageUrl);
+                Log.i("RiderData", "Guild Name: " + guildName);
+
+                RiderData riderData = new RiderData(
+                        getBitmapFromURL(riderImageUrl),
+                        riderName,
+                        getBitmapFromURL(gloveImageUrl),
+                        getBitmapFromURL(guildImageUrl),
+                        guildName);
+
+                publishProgress(riderData);
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-
-            Document document = Jsoup.parse(receivedHtml[0]);
-            String riderImageUrl = document.select("span#RiderImg > img").attr("src");
-            String riderName = document.select("span#RiderName").text();
-            String gloveImageUrl = document.select("div#GloveImg > img").attr("src");
-            String guildImageUrl = document.select("span#GuildImg > img").attr("src");
-            String guildName = document.select("span#GuildName").text();
-
-            Log.i("RiderData", "Rider Image URL: " + riderImageUrl);
-            Log.i("RiderData", "Rider Name: " + riderName);
-            Log.i("RiderData", "Glove Image URL: " + gloveImageUrl);
-            Log.i("RiderData", "Guild Image URL: " + guildImageUrl);
-            Log.i("RiderData", "Guild Name: " + guildName);
-
-            RiderData riderData = new RiderData(
-                    getBitmapFromURL(riderImageUrl),
-                    riderName,
-                    getBitmapFromURL(gloveImageUrl),
-                    getBitmapFromURL(guildImageUrl),
-                    guildName);
-
-            publishProgress(riderData);
             return null;
         }
 
@@ -242,13 +184,6 @@ public class GarageParser {
         protected void onProgressUpdate(RiderData... values) {
             if (riderDataReceiveListener != null) {
                 riderDataReceiveListener.onRiderDataReceive(values[0]);
-            }
-        }
-
-        @Override
-        protected void onPostExecute(Integer integer) {
-            if (riderDataReceiveListener != null) {
-                riderDataReceiveListener.onParsingEnd();
             }
         }
 
@@ -273,118 +208,89 @@ public class GarageParser {
     private class ItemParseTask extends AsyncTask<String, ItemData, Integer> {
         @Override
         protected Integer doInBackground(final String... params) {
-            final String[] receivedHtml = new String[1];
-            ((Activity) context).runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    htmlLoader.requestGetHtml(ITEM_URL + params[0]);
-                    htmlLoader.setHtmlLoadListener(new HtmlLoader.HtmlLoadListener() {
-                        @Override
-                        public void onHtmlLoad(String html) {
-                            receivedHtml[0] = html;
-                        }
-                    });
-                }
-            });
+            try {
+                Document document = Jsoup.connect(params[0]).get();
+                Elements elements = document.select("div#CntItemDet dl");
+                final int characterCount = getCountFromString(elements.eq(0).select("dd").text());
+                final int kartCount = getCountFromString(elements.eq(1).select("dd").text());
+                final int wearingCount = getCountFromString(elements.eq(2).select("dd").text());
+                final int embellishmentCount = getCountFromString(elements.eq(3).select("dd").text());
+                final int etcCount = getCountFromString(elements.eq(4).select("dd").text());
 
-            while(receivedHtml[0] == null) {
-                if (isCancelled()) {
-                    return null;
-                }
-            }
+                Log.i("Count", "Character : " + characterCount);
+                Log.i("Count", "Kart : " + kartCount);
+                Log.i("Count", "Wearing : " + wearingCount);
+                Log.i("Count", "Embellishment : " + embellishmentCount);
+                Log.i("Count", "Etc : " + etcCount);
 
-            Document document = Jsoup.parse(receivedHtml[0]);
-            Elements elements = document.select("div#CntItemDet dl");
-            final int characterCount = getCountFromString(elements.eq(0).select("dd").text());
-            final int kartCount = getCountFromString(elements.eq(1).select("dd").text());
-            final int wearingCount = getCountFromString(elements.eq(2).select("dd").text());
-            final int embellishmentCount = getCountFromString(elements.eq(3).select("dd").text());
-            final int etcCount = getCountFromString(elements.eq(4).select("dd").text());
-
-            Log.i("Count", "Character : " + characterCount);
-            Log.i("Count", "Kart : " + kartCount);
-            Log.i("Count", "Wearing : " + wearingCount);
-            Log.i("Count", "Embellishment : " + embellishmentCount);
-            Log.i("Count", "Etc : " + etcCount);
-
-            ((Activity) context).runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    if (itemDataReceiveListener != null) {
-                        itemDataReceiveListener.onItemCountReceive(characterCount, kartCount, wearingCount, embellishmentCount, etcCount);
-                    }
-                }
-            });
-
-            final ArrayList<ItemData> items = new ArrayList<>();
-            elements = document.select("li.ItemList");
-            for (int i = 0;i < elements.size();i ++) {
-                if (isCancelled()) {
-                    return null;
-                }
-
-                Element element = elements.get(i);
-                String imageUrl = element.select("span.ImgItem img").attr("src");
-                String name = element.select("span.TxtItemDate").text();
-                String count = element.select("span.TxtItemInfo").text();
-                Log.i("Representation", "url : " + imageUrl);
-                Log.i("Representation", "name : " + name);
-                Log.i("Representation", "count : " + count);
-                items.add(new ItemData(getBitmapFromURL(imageUrl), name, count));
-            }
-
-            ((Activity) context).runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    if (itemDataReceiveListener != null) {
-                        itemDataReceiveListener.onRepresentationItemReceive(items);
-                    }
-                }
-            });
-
-            for (int page = 1;page > 0;page ++) {
-                final int tmp = page;
-                receivedHtml[0] = null;
                 ((Activity) context).runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        htmlLoader.requestGetHtml(ITEM_URL + params[0] + "&page=" + tmp);
-                        htmlLoader.setHtmlLoadListener(new HtmlLoader.HtmlLoadListener() {
-                            @Override
-                            public void onHtmlLoad(String html) {
-                                receivedHtml[0] = html;
-                            }
-                        });
+                        if (itemDataReceiveListener != null) {
+                            itemDataReceiveListener.onItemCountReceive(characterCount, kartCount, wearingCount, embellishmentCount, etcCount);
+                        }
                     }
                 });
 
-                while(receivedHtml[0] == null) {
+                final ArrayList<ItemData> items = new ArrayList<>();
+                elements = document.select("li.ItemList");
+                for (int i = 0; i < elements.size(); i++) {
                     if (isCancelled()) {
                         return null;
                     }
-                }
 
-                document = Jsoup.parse(receivedHtml[0]);
-                elements = document.select("li.ItemList1");
-                for (int i = 0;i < elements.size();i ++) {
-                    if (isCancelled()) {
-                        return null;
-                    }
                     Element element = elements.get(i);
-                    String imageUrl = element.select("span.ImgItem img").attr("src");
-                    String name = element.select("span.TxtItem").text();
-                    Log.i("ITEM", "URL : " + imageUrl);
-                    Log.i("ITEM", "NAME : " + name);
-
-                    if (name.isEmpty()) {
-                        page = -1;
-                        break;
+                    String data = element.select("span.ImgItem img").attr("onclick");
+                    if (data.isEmpty()) {
+                        continue;
                     }
+                    data = data.substring(data.indexOf("'") + 1, data.lastIndexOf("'"));
+                    ItemData itemData = processData(data);
 
-                    publishProgress(new ItemData(getBitmapFromURL(imageUrl), name, ""));
+                    if (itemData.getName().isEmpty()) {
+                        String name = element.select("span.TxtItem").text();
+                        itemData.setName(name);
+                    }
+                    items.add(itemData);
                 }
+
+                ((Activity) context).runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (itemDataReceiveListener != null) {
+                            itemDataReceiveListener.onRepresentationItemReceive(items);
+                        }
+                    }
+                });
+
+                for (int page = 1; page > 0; page++) {
+                    document = Jsoup.connect(params[0] + "&page=" + page).get();
+                    elements = document.select("li.ItemList1");
+                    for (int i = 0; i < elements.size(); i++) {
+                        if (isCancelled()) {
+                            return null;
+                        }
+
+                        Element element = elements.get(i);
+                        String data = element.select("span.ImgItem a").attr("onclick");
+                        if (data.isEmpty()) {
+                            page = -1;
+                            break;
+                        }
+                        data = data.substring(data.indexOf("'") + 1, data.lastIndexOf("'"));
+                        ItemData itemData = processData(data);
+
+                        if (itemData.getName().isEmpty()) {
+                            String name = element.select("span.TxtItem").text();
+                            itemData.setName(name);
+                        }
+
+                        publishProgress(itemData);
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            itemDataReceiveListener.onParsingEnd();
             return null;
         }
 
@@ -415,17 +321,22 @@ public class GarageParser {
 
             return null;
         }
+
+        private ItemData processData(String data) throws IOException {
+            String str = Jsoup.connect("http://kart.nexon.com/Garage/ItemDetail?Info=" + data).get().text();
+            String[] split = str.split("'");
+
+            return new ItemData(getBitmapFromURL(split[11]), split[3], split[5]);
+        }
     }
 
     public interface RiderDataReceiveListener {
         public void onRiderDataReceive(RiderData riderData);
-        public void onParsingEnd();
     }
 
     public interface ItemDataReceiveListener {
         public void onItemCountReceive(int characterCount, int kartCount, int wearingCount, int embellishmentCount, int etcCount);
         public void onRepresentationItemReceive(ArrayList<ItemData> items);
-        public void onAllItemReceive(ItemData data);
-        public void onParsingEnd();
+        public void onAllItemReceive(ItemData item);
     }
 }
