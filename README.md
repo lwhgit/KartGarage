@@ -47,7 +47,7 @@
             for (GarageParser.RecordData recordData : data) {
                 textView.append("\nR : " + recordData.getKind() + recordData.getOdds() + recordData.getRp());
             }
-        }
+        } // 길이가 3인 배열이 나오게 됩니다.
     
         @Override
         public void onGrandPrixReceive(ArrayList<GarageParser.GrandPrixData> dataList) {
@@ -63,7 +63,7 @@
                     textView.append("\nT : " + data.getName() + data.getRanking() + data.getKart() + data.getRecord());
                 }
             }
-        }
+        } // 길이가 4인 dataList배열이 나옵니다. 각 배열은 또 타임어택 데이터로 이루어진 리스트로 구성되어 있습니다.
     }); // 기록실 데이터
         
     garageParser.parseMain();
